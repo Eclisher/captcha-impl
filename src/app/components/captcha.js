@@ -9,6 +9,7 @@ const CaptchaSequence = () => {
   const [output, setOutput] = useState([]);
   const [isSequenceRunning, setIsSequenceRunning] = useState(false);
 
+  // Charger le script du CAPTCHA
   useEffect(() => {
     const loadScript = () => {
       const script = document.createElement("script");
@@ -25,6 +26,7 @@ const CaptchaSequence = () => {
     }
   }, [scriptLoaded]);
 
+  // Initialiser le CAPTCHA après le chargement du script
   useEffect(() => {
     if (scriptLoaded && typeof window !== "undefined" && window.AwsWafCaptcha) {
       window.showMyCaptcha = () => {
@@ -34,7 +36,7 @@ const CaptchaSequence = () => {
           onSuccess: (token) => {
             setWafToken(token);
             setIsCaptchaVisible(false);
-            setIsSequenceRunning(true);
+            setIsSequenceRunning(true); // Reprise de la séquence
           },
           onError: (error) => {
             console.error("Captcha Error:", error);
@@ -44,6 +46,7 @@ const CaptchaSequence = () => {
     }
   }, [scriptLoaded]);
 
+  // Démarrer la séquence
   const startSequence = async (N) => {
     setOutput([]);
     setIsSequenceRunning(true);
@@ -57,23 +60,32 @@ const CaptchaSequence = () => {
         if (response.ok) {
           setOutput((prev) => [...prev, `${i}. Forbidden`]);
         } else if (response.status === 403) {
+          console.warn("403 Forbidden: Showing CAPTCHA");
           setIsCaptchaVisible(true);
           setIsSequenceRunning(false);
           break;
+        } else if (response.status === 405) {
+          console.warn("405 Method Not Allowed: Showing CAPTCHA");
+          setIsCaptchaVisible(true);
+          window.showMyCaptcha && window.showMyCaptcha(); // Appeler CAPTCHA
+          setIsSequenceRunning(false);
+          break;
         } else {
-          throw new Error("Unexpected response");
+          throw new Error(`Unexpected response status: ${response.status}`);
         }
       } catch (error) {
         console.error(`Error at step ${i}:`, error);
         break;
       }
 
+      // Pause d'une seconde entre chaque requête
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     setIsSequenceRunning(false);
   };
 
+  // Gestion de la soumission du formulaire
   const handleFormSubmit = (e) => {
     e.preventDefault();
     const N = parseInt(e.target.elements.number.value, 10);
@@ -82,6 +94,7 @@ const CaptchaSequence = () => {
 
   return (
     <div>
+      {/* Formulaire d'entrée */}
       {!isCaptchaVisible && !isSequenceRunning && (
         <form onSubmit={handleFormSubmit}>
           <label>
@@ -92,6 +105,7 @@ const CaptchaSequence = () => {
         </form>
       )}
 
+      {/* CAPTCHA */}
       {isCaptchaVisible && (
         <div id="my-captcha-container">
           <button onClick={() => window.showMyCaptcha()}>
@@ -100,6 +114,7 @@ const CaptchaSequence = () => {
         </div>
       )}
 
+      {/* Résultats */}
       <div>
         <h2>Output:</h2>
         <pre>{output.join("\n")}</pre>
